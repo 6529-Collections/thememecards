@@ -1,0 +1,133 @@
+---
+output: rmarkdown::github_document
+editor_options: 
+  chunk_output_type: console
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, comment="")
+library(tidyverse)
+library(magrittr)
+```
+
+## Data
+```{r}
+fn <- "15784969.csv"
+snapshot <- readr::read_csv(fn, col_types=c("ccdcc"))
+snapshot$balance <- as.integer(snapshot$balance)
+summary(snapshot)
+```
+
+## Seed
+```{r}
+block <- 15788269 # https://etherscan.io/block/15788269
+block_hash <- "0x9d79461aef328836b8142c299525193594da145ee2ca87f3e18a0baea27335d2"
+# Convert block hash to ASCII
+# Take the sum over integer vector to set seed
+seed <- sum(utf8ToInt(block_hash))
+cat("Seed:", seed, "\n")
+```
+
+## Code
+```{r}
+subtract_multi <- function(x, y) {
+  for (i in y) {
+    where <- match(i, x)
+    if (!is.na(where)) {
+      x <- x[-where]
+    }
+  }
+  return(x)
+}
+
+pick <- function(df,
+                 contracts=c(),
+                 address_remove=NULL,
+                 address_subtract=NULL,
+                 address_max=Inf,
+                 address_pick=NA,
+                 address_replace=FALSE) {
+
+  df <- df %>%
+    dplyr::filter(name %in% contracts) %>%
+    dplyr::filter(!(address %in% address_remove))
+  
+  df_by_address <- df %>%
+    dplyr::group_by(address) %>%
+    dplyr::summarise(
+      balance = ifelse(sum(balance) <= address_max, sum(balance), address_max)
+    )
+  
+  pool <- df_by_address %>%
+    dplyr::arrange(address) %>%
+    dplyr::select(address, balance) %>%
+    purrr::pmap(function(address, balance) {
+      base::rep(address, balance)
+    }) %>%
+    unlist() %>%
+    subtract_multi(address_subtract)
+  
+  if (is.na(address_pick)) {
+    return(pool)
+  } else {
+    return(base::sample(pool, size=address_pick, replace=address_replace))
+  }
+}
+
+tally <- function(x) {
+  if (length(x) > 0) {
+    unlist(x) %>%
+    data.frame(address = .) %>%
+    dplyr::group_by(address) %>%
+    dplyr::summarise(
+      amount = n()
+    ) %>%
+    dplyr::arrange(desc(amount), address)
+  }
+}
+```
+
+```{r}
+base::set.seed(seed)
+
+address_remove <- c(
+  "0x3a3548e060be10c2614d0a4cb0c03cc9093fd799",
+  "0xc6400a5584db71e41b0e5dfbdc769b54b91256cd",
+  "0x4b76837f8d8ad0a28590d06e53dcd44b6b7d4554"
+)
+
+hodlers_remove <- c(
+  ""
+)
+
+airdrop_gradient  <- pick(snapshot, contracts=c("gradient"),address_remove=address_remove, address_pick=20)
+
+allow_gradient    <- pick(snapshot, contracts=c("gradient"), address_remove=address_remove, address_subtract=airdrop_gradient,address_max=1)
+allow_raw         <- pick(snapshot, contracts=c("raw"), address_remove=address_remove,address_max=1)
+allow_singles     <- pick(snapshot, contracts=c("65291/1s"), address_remove=address_remove,address_max=1)
+```
+
+## Airdrop
+```{r}
+c(airdrop_gradient) %>%
+tally() %T>%
+readr::write_csv(file="airdrop.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Allow
+```{r}
+c(allow_gradient, allow_raw, allow_singles) %>%
+tally() %T>%
+readr::write_csv(file="allow.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Versioning
+```{r}
+R.version$version.string
+packageVersion("tidyverse")
+packageVersion("magrittr")
+```
