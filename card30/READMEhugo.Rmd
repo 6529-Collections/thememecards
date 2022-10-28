@@ -1,0 +1,165 @@
+---
+output: rmarkdown::github_document
+editor_options: 
+  chunk_output_type: console
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, comment="")
+library(tidyverse)
+library(magrittr)
+```
+
+## Data
+```{r}
+fn <- "15813749.csv"
+snapshot <- readr::read_csv(fn, col_types=c("ccdcc"))
+snapshot$balance <- as.integer(snapshot$balance)
+summary(snapshot)
+```
+
+## Seed
+```{r}
+block <- 15817169 # https://etherscan.io/block/15817169
+block_hash <- "0xe731f156daf3ce505f9ac8201b55def3e3f654b50f826c28bb06aa47a102e293"
+# Convert block hash to ASCII
+# Take the sum over integer vector to set seed
+seed <- sum(utf8ToInt(block_hash))
+cat("Seed:", seed, "\n")
+```
+
+## Code
+```{r}
+subtract_multi <- function(x, y) {
+  for (i in y) {
+    where <- match(i, x)
+    if (!is.na(where)) {
+      x <- x[-where]
+    }
+  }
+  return(x)
+}
+
+pick <- function(df,
+                 contracts=c(),
+                 address_remove=NULL,
+                 address_subtract=NULL,
+                 address_max=Inf,
+                 address_pick=NA,
+                 address_replace=FALSE) {
+
+  df <- df %>%
+    dplyr::filter(name %in% contracts) %>%
+    dplyr::filter(!(address %in% address_remove))
+  
+  df_by_address <- df %>%
+    dplyr::group_by(address) %>%
+    dplyr::summarise(
+      balance = ifelse(sum(balance) <= address_max, sum(balance), address_max)
+    )
+  
+  pool <- df_by_address %>%
+    dplyr::arrange(address) %>%
+    dplyr::select(address, balance) %>%
+    purrr::pmap(function(address, balance) {
+      base::rep(address, balance)
+    }) %>%
+    unlist() %>%
+    subtract_multi(address_subtract)
+  
+  if (is.na(address_pick)) {
+    return(pool)
+  } else {
+    return(base::sample(pool, size=address_pick, replace=address_replace))
+  }
+}
+
+tally <- function(x) {
+  if (length(x) > 0) {
+    unlist(x) %>%
+    data.frame(address = .) %>%
+    dplyr::group_by(address) %>%
+    dplyr::summarise(
+      amount = n()
+    ) %>%
+    dplyr::arrange(desc(amount), address)
+  }
+}
+```
+
+```{r}
+base::set.seed(seed)
+
+address_remove <- c(
+  "0x3a3548e060be10c2614d0a4cb0c03cc9093fd799",
+  "0xc6400a5584db71e41b0e5dfbdc769b54b91256cd",
+  "0x4b76837f8d8ad0a28590d06e53dcd44b6b7d4554",
+  "0x0887773b5f43c58f0da7bd0402fc2d49482eb845",
+  "0xcda72070e455bb31c7690a170224ce43623d0b6f",
+  "0xbbdd72fcce73c2626719be00259ddffef0d5673d",
+  "0xea39c551834d07ee2ee87f1ceff843c308e089af",
+  "0x0a98f97e89743406a8611e1b4219a073b60ffed3",
+  "0x43b0bd27d5016e969193412933387b0dd4cf3e0a",
+  "0x6f113b0c8c7266d7514e4986e3d6aaf013b6754f",
+  "0x982d3c5223f6b5794fccb3208eb164d042cf2526",
+  "0xcabd5f77ca9d48f4ef9793f20de42ad39ce93979",
+  "0x43b0bd27d5016e969193412933387b0dd4cf3e0a",
+  "0xcaa1c396e70384db58dd33be74b26fb119e98c3a",
+  "0xee2c055f7706b9dfcd98cd5a23d5629d6316c0bd",
+  "0x7ed69ff055d746d451f675635e9bf773accc6a97",
+  "0x0887773b5f43c58f0da7bd0402fc2d49482eb845",
+  "0x57c25777bd6dffb3251306c0a6449bebb58a7af0",
+  "0x16dee223fc168abff7b979813cdf15866eed7e8d",
+  "0x4c48d00997c6d23d6b47a9ce8caa6027d0068e42",
+  "0xa7cafd18dd8bc1e23203058d66f89f0f0ee539d9",
+  "0x54913cc8ea17731d62589039dd0152f306473843",
+  "0xcaf3365d474690a1ac6643d3d6ef44cb0c6deec4",
+  "0x69cb3b1de24e08f1cfc2994171b6c6930498f750",
+  "0xd1f6e5592361257aef68b96df42aef064080c5cc",
+  "0xdffd6968900b3f4f667b69c5f9df65d9d7796a1c",
+  "0x1a4370fdd7173d0a41ff7c63a8e0249479ba0225",
+  "0x48464efe55fbcae8ae0c992b306afcf21d4910cf",
+  "0xcd241563f7288b5eb2b9b715f736232889b62d8b",
+  "0x388160a99390392278afdba240046b8b5e73f77b",
+  "0xf1f476f144df01480297dca47efca565e8b0c9f1",
+  "0x248458947c120ca057ec028b3fe7e4b3f26fdb3d"
+
+
+)
+
+hodlers_remove <- c(
+  ""
+)
+
+airdrop_gradient  <- pick(snapshot, contracts=c("gradient"),address_remove=address_remove, address_pick=3)
+
+allow_gradient    <- pick(snapshot, contracts=c("gradient"), address_remove=address_remove, address_subtract=airdrop_gradient,address_max=1)
+allow_memes       <- pick(snapshot, contracts=c("memes"), address_remove=address_remove, address_max=1)
+allow_raw         <- pick(snapshot, contracts=c("raw"), address_remove=address_remove,address_max=1)
+allow_singles     <- pick(snapshot, contracts=c("65291/1s"), address_remove=address_remove,address_max=1)
+```
+
+## Airdrop
+```{r}
+c(airdrop_gradient) %>%
+tally() %T>%
+readr::write_csv(file="airdrop.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Allow
+```{r}
+c(allow_gradient,allow_memes, allow_raw, allow_singles) %>%
+tally() %T>%
+readr::write_csv(file="allow.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Versioning
+```{r}
+R.version$version.string
+packageVersion("tidyverse")
+packageVersion("magrittr")
+```
