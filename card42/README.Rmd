@@ -1,0 +1,225 @@
+---
+output: rmarkdown::github_document
+editor_options: 
+  chunk_output_type: console
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, comment="")
+library(tidyverse)
+library(magrittr)
+```
+
+## Data
+```{r}
+fn <- "16114269.csv"
+snapshot <- readr::read_csv(fn, col_types=c("ccdcc"))
+snapshot$balance <- as.integer(snapshot$balance)
+summary(snapshot)
+```
+
+## Seed
+```{r}
+block <- 16117942 # https://etherscan.io/block/16117942
+block_hash <- "0x4772038b5ef4b30401d5bdc2160a1832b899882ab60ecf8a3bc7aeb60724c035"
+# Convert block hash to ASCII
+# Take the sum over integer vector to set seed
+seed <- sum(utf8ToInt(block_hash))
+cat("Seed:", seed, "\n")
+```
+
+## Code
+```{r}
+subtract_multi <- function(x, y) {
+  for (i in y) {
+    where <- match(i, x)
+    if (!is.na(where)) {
+      x <- x[-where]
+    }
+  }
+  return(x)
+}
+
+pick <- function(df,
+                 contracts=c(),
+                 address_remove=NULL,
+                 address_subtract=NULL,
+                 address_max=Inf,
+                 address_pick=NA,
+                 address_replace=FALSE) {
+
+  df <- df %>%
+    dplyr::filter(name %in% contracts) %>%
+    dplyr::filter(!(address %in% address_remove))
+  
+  df_by_address <- df %>%
+    dplyr::group_by(address) %>%
+    dplyr::summarise(
+      balance = ifelse(sum(balance) <= address_max, sum(balance), address_max)
+    )
+  
+  pool <- df_by_address %>%
+    dplyr::arrange(address) %>%
+    dplyr::select(address, balance) %>%
+    purrr::pmap(function(address, balance) {
+      base::rep(address, balance)
+    }) %>%
+    unlist() %>%
+    subtract_multi(address_subtract)
+  
+  if (is.na(address_pick)) {
+    return(pool)
+  } else {
+    return(base::sample(pool, size=address_pick, replace=address_replace))
+  }
+}
+
+tally <- function(x) {
+  if (length(x) > 0) {
+    unlist(x) %>%
+    data.frame(address = .) %>%
+    dplyr::group_by(address) %>%
+    dplyr::summarise(
+      amount = n()
+    ) %>%
+    dplyr::arrange(desc(amount), address)
+  }
+}
+```
+
+```{r}
+base::set.seed(seed)
+
+address_remove <- c(
+  "0x3a3548e060be10c2614d0a4cb0c03cc9093fd799",
+  "0xc6400a5584db71e41b0e5dfbdc769b54b91256cd",
+  "0x4b76837f8d8ad0a28590d06e53dcd44b6b7d4554",
+  "0x0887773b5f43c58f0da7bd0402fc2d49482eb845",
+  "0xcda72070e455bb31c7690a170224ce43623d0b6f",
+  "0x41a322b28d0ff354040e2cbc676f0320d8c8850d",
+  "0x000000000000000000000000000000000000dead"
+)
+
+hodlers_remove <- c(
+  ""
+)
+
+airdrop_gradient   <- pick(snapshot, contracts=c("gradient"), address_pick=79,address_max=1)
+airdrop_memes1     <- pick(snapshot, contracts=c("memes1"),address_remove=address_remove, address_pick=50,address_max=1)
+airdrop_memes2     <- pick(snapshot, contracts=c("memes2"),address_remove=address_remove, address_pick=38,address_max=1)
+airdrop_memes3     <- pick(snapshot, contracts=c("memes3"),address_remove=address_remove, address_pick=50,address_max=1)
+airdrop_memes4     <- pick(snapshot, contracts=c("memes4"),address_remove=address_remove, address_pick=75,address_max=1)
+airdrop_memes5     <- pick(snapshot, contracts=c("memes5"),address_remove=address_remove, address_pick=413,address_max=1)
+airdrop_unic       <- pick(snapshot, contracts=c("UNIC"), address_remove=address_remove,address_subtract = c(airdrop_memes1, airdrop_memes2, airdrop_memes3, airdrop_memes4, airdrop_memes5), address_pick=57,address_max=1)
+airdrop_nouns      <- pick(snapshot, contracts=c("Nouns"), address_remove=address_remove,address_subtract = c(airdrop_memes1, airdrop_memes2, airdrop_memes3, airdrop_memes4, airdrop_memes5), address_pick=9,address_max=1)
+airdrop_mfers      <- pick(snapshot, contracts=c("mfers"), address_remove=address_remove,address_subtract = c(airdrop_memes1, airdrop_memes2, airdrop_memes3, airdrop_memes4, airdrop_memes5), address_pick=168,address_max=1)
+airdrop_moonbirds  <- pick(snapshot, contracts=c("Moonbirds"), address_remove=address_remove,address_subtract = c(airdrop_memes1, airdrop_memes2, airdrop_memes3, airdrop_memes4, airdrop_memes5), address_pick=197,address_max=1)
+airdrop_toadz      <- pick(snapshot, contracts=c("CrypToadz"), address_remove=address_remove,address_subtract = c(airdrop_memes1, airdrop_memes2, airdrop_memes3, airdrop_memes4, airdrop_memes5), address_pick=123,address_max=1)
+airdrop_cdbs       <- pick(snapshot, contracts=c("CryptoDickbutts"), address_remove=address_remove,address_subtract = c(airdrop_memes1, airdrop_memes2, airdrop_memes3, airdrop_memes4, airdrop_memes5), address_pick=54,address_max=1)
+```
+
+## Airdrop Gradient
+```{r}
+c(airdrop_gradient) %>%
+tally() %T>%
+readr::write_csv(file="airdrop_gradient.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Airdrop Memes1
+```{r}
+c(airdrop_memes1) %>%
+tally() %T>%
+readr::write_csv(file="airdrop_memes1.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Airdrop Memes2
+```{r}
+c(airdrop_memes2) %>%
+tally() %T>%
+readr::write_csv(file="airdrop_memes2.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Airdrop Memes3
+```{r}
+c(airdrop_memes3) %>%
+tally() %T>%
+readr::write_csv(file="airdrop_memes3.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Airdrop Memes4
+```{r}
+c(airdrop_memes4) %>%
+tally() %T>%
+readr::write_csv(file="airdrop_memes4.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Airdrop Memes5
+```{r}
+c(airdrop_memes5) %>%
+tally() %T>%
+readr::write_csv(file="airdrop_memes5.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Airdrop Unic
+```{r}
+c(airdrop_unic) %>%
+tally() %T>%
+readr::write_csv(file="airdrop_unic.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Airdrop Nouns
+```{r}
+c(airdrop_nouns) %>%
+tally() %T>%
+readr::write_csv(file="airdrop_nouns.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Airdrop mfers
+```{r}
+c(airdrop_mfers) %>%
+tally() %T>%
+readr::write_csv(file="airdrop_mfers.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Airdrop moonbirds
+```{r}
+c(airdrop_moonbirds) %>%
+tally() %T>%
+readr::write_csv(file="airdrop_moonbirds.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Airdrop toadz
+```{r}
+c(airdrop_toadz) %>%
+tally() %T>%
+readr::write_csv(file="airdrop_toadz.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Airdrop cdbs
+```{r}
+c(airdrop_cdbs) %>%
+tally() %T>%
+readr::write_csv(file="airdrop_cdbs.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+
+## Versioning
+```{r}
+R.version$version.string
+packageVersion("tidyverse")
+packageVersion("magrittr")
+```
