@@ -1,0 +1,494 @@
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+## Data
+
+``` r
+fn <- "memesphase2.csv"
+snapshot <- readr::read_csv(fn, col_types=c("ccdcc"))
+snapshot$balance <- as.integer(snapshot$balance)
+summary(snapshot)
+```
+
+       address            token_id            balance    contract        
+     Length:19175       Length:19175       Min.   :1   Length:19175      
+     Class :character   Class :character   1st Qu.:1   Class :character  
+     Mode  :character   Mode  :character   Median :1   Mode  :character  
+                                           Mean   :1                     
+                                           3rd Qu.:1                     
+                                           Max.   :1                     
+         name          
+     Length:19175      
+     Class :character  
+     Mode  :character  
+                       
+                       
+                       
+
+## Seed
+
+``` r
+block <- 16810669 # https://etherscan.io/block/16810669
+block_hash <- "0x77ba41a680718f6f1dd3d133542ea03060b46a19e75a85bb1c0acb857f44cd93"
+# Convert block hash to ASCII
+# Take the sum over integer vector to set seed
+seed <- sum(utf8ToInt(block_hash))
+cat("Seed:", seed, "\n")
+```
+
+    Seed: 4585 
+
+## Code
+
+``` r
+subtract_multi <- function(x, y) {
+  for (i in y) {
+    where <- match(i, x)
+    if (!is.na(where)) {
+      x <- x[-where]
+    }
+  }
+  return(x)
+}
+
+pick <- function(df,
+                 contracts=c(),
+                 address_remove=NULL,
+                 address_subtract=NULL,
+                 address_max=Inf,
+                 address_pick=NA,
+                 address_replace=FALSE) {
+
+  df <- df %>%
+    dplyr::filter(name %in% contracts) %>%
+    dplyr::filter(!(address %in% address_remove))
+  
+  df_by_address <- df %>%
+    dplyr::group_by(address) %>%
+    dplyr::summarise(
+      balance = ifelse(sum(balance) <= address_max, sum(balance), address_max)
+    )
+  
+  pool <- df_by_address %>%
+    dplyr::arrange(address) %>%
+    dplyr::select(address, balance) %>%
+    purrr::pmap(function(address, balance) {
+      base::rep(address, balance)
+    }) %>%
+    unlist() %>%
+    subtract_multi(address_subtract)
+  
+  if (is.na(address_pick)) {
+    return(pool)
+  } else {
+    return(base::sample(pool, size=address_pick, replace=address_replace))
+  }
+}
+
+tally <- function(x) {
+  if (length(x) > 0) {
+    unlist(x) %>%
+    data.frame(address = .) %>%
+    dplyr::group_by(address) %>%
+    dplyr::summarise(
+      amount = n()
+    ) %>%
+    dplyr::arrange(desc(amount), address)
+  }
+}
+```
+
+``` r
+base::set.seed(seed)
+
+address_remove <- c(
+  "0x3a3548e060be10c2614d0a4cb0c03cc9093fd799",
+  "0xc6400a5584db71e41b0e5dfbdc769b54b91256cd",
+  "0x4b76837f8d8ad0a28590d06e53dcd44b6b7d4554",
+  "0x0887773b5f43c58f0da7bd0402fc2d49482eb845",
+  "0xcda72070e455bb31c7690a170224ce43623d0b6f",
+  "0x41a322b28d0ff354040e2cbc676f0320d8c8850d",
+  "0x000000000000000000000000000000000000dead"
+)
+
+hodlers_remove <- c(
+  ""
+)
+
+allow_memes2       <- pick(snapshot, contracts=c("memes2"), address_pick=342,address_max=1)
+```
+
+## Allow Memes2
+
+``` r
+c(allow_memes2) %>%
+tally() %T>%
+readr::write_csv(file="allow_memes_phase2.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+    # A tibble: 342 × 2
+        address                                    amount
+        <chr>                                       <int>
+      1 0x00af1f05c68de87cef3880012feaa227e1d6280d      1
+      2 0x01282b55c6be0b0d724d2a9324feb3c08229f2ca      1
+      3 0x0360b9acda197703cb3040715c75659c38f13cf7      1
+      4 0x03bb5043f5a986403adba0f35e1f286deed5a840      1
+      5 0x03f0e71ac43276fcf0b327b1abe8cdf5974aecc1      1
+      6 0x04490fb053a8ff110bea35f22d955c0092aae5f8      1
+      7 0x0542955e1149e9102b7eb80d0f04f15d5cb3abab      1
+      8 0x05503136f1063e9669764e10c1700ef6a910070d      1
+      9 0x073d260eef1a0299bc04d82ceb5501a492e08f6c      1
+     10 0x074396d67d04c48fdbef50af95df216185b63cd5      1
+     11 0x0784852dd7cb75f3e4dccabe2541c686a8705dca      1
+     12 0x09309b99f3b43648734caeeaa752f77c679a2918      1
+     13 0x0974ff7e79d93c462421f23520c0e6ba300dcb97      1
+     14 0x09e6267d0cb691fe647da5029d28ab0fd62d9325      1
+     15 0x0b4f05137beae5d828b0649dc6ba184572d5480c      1
+     16 0x0b9ed225ac0098a1507e914ab96a4a4af5497026      1
+     17 0x0b9f898921b2bb8cd2d7d30faffec2c90200cc8c      1
+     18 0x0c0d8f387030c631de001d99d40b2e519cf4d10f      1
+     19 0x0c54a765c77a88d9cda0bd7ad9b10422848d92ef      1
+     20 0x0cef3f0ad32acd2e2a70b76f9fd24d50d88b195d      1
+     21 0x0fafa30d377704eada7a9c83f374f409b3b46046      1
+     22 0x0fc08f56248f6667904c896307796f748700c7b6      1
+     23 0x112a1530ec2242b4dcbe1657aaf56cd821c30f76      1
+     24 0x11360f0c5552443b33720a44408aba01a809905e      1
+     25 0x11d9b73fd7f18b8e5cae9b1abb95c7203c890f04      1
+     26 0x1246191c1bbcde42c1ee83e3745ba8ab37478827      1
+     27 0x1370006e1416c3651f1bce41370804a1868c5b3a      1
+     28 0x13a716dd20763000cbf87f999548c3d67f936d35      1
+     29 0x13bfd26cf7d981aae5f8d4d88af4b34b4b1d4da4      1
+     30 0x1566ae673ae80725bcce901b486c336e6acef465      1
+     31 0x162af4fd4d2f2d3a721aeee22e3cbb640f23735a      1
+     32 0x166b8de4cf92d6e1da50d2811b7dc58c76b73072      1
+     33 0x1688ca553e48049f192dc727ff14414bf1524243      1
+     34 0x16b0d1368146939e5c8f8e574f09f175baec5996      1
+     35 0x16c3676077017b856dff4514170332abd7dc2729      1
+     36 0x177751396d8236569c5c7b04232c7b7281a3b9f3      1
+     37 0x1a7861a39e74d93c8eb883d774f168be46f81228      1
+     38 0x1adef8b7253c43caaf50500913d422ae688367bd      1
+     39 0x1af331dc34dd7c5c62af28b5685328318b61888a      1
+     40 0x1af369bc1069dd286ff59cd69553550c07e0dd05      1
+     41 0x1b7bb9251a6220b42e920350ac0fa3004b38729e      1
+     42 0x1c3279b9ebf11f6fad79f49cb91a510460058744      1
+     43 0x1d05a2ec18c7d4707ed4cd40e7e76a680e4618e3      1
+     44 0x1d3eda0356e492d51fde4ffb8651c549bdecbdca      1
+     45 0x1d6128628d63415a0aaaed455ed1ea38d880f645      1
+     46 0x1de4d49959eafa01ab3706aa20707a3f1dbe2424      1
+     47 0x1e4ce54629842c52b11ccde4ffe77a497aa42bf8      1
+     48 0x1e6d8d1a6076916d38b120740308d07c01cdb2c7      1
+     49 0x1e84ddcb5b6e5d23aed0ddb9a58adc146e22325e      1
+     50 0x1f623ee324ca178941545f01bfccfea38cda2072      1
+     51 0x1fd2ce0675121278a524a7bb4041f160d51c756f      1
+     52 0x205b07af095793ccef2b1b24fe5d54f4aaacb6d4      1
+     53 0x20aa168e6c793646f60737399c8466dd643d4281      1
+     54 0x212caa051f36024a53ebc7817fd1f93e130d188d      1
+     55 0x2310da9a053ee821086eb150025f67db0313ada3      1
+     56 0x231a99192dbd87752e2f483c0ecbd4b71ea95c67      1
+     57 0x2410196751681c71a9b92096297f76a4d1ce2813      1
+     58 0x24ee3cfc053d13f1c2a395471cc305b3ba831d8c      1
+     59 0x258e0ae28f70ec728a9c0d84268ca3dd5c69fb3c      1
+     60 0x26b0f2d8c16e0076d9c00ff68bda5e75563bd215      1
+     61 0x26d7b4fe67f4601643304b5023b3caf3a72e8504      1
+     62 0x27be3bae241df173585757154f6fa489111dd262      1
+     63 0x27e121bfb21f631496ad5b9783d049facbdd411e      1
+     64 0x284b7200cc90cef0df0a9b14081fdd4d40bc9b7a      1
+     65 0x284fdd26d51b2fba3db0eb36f40617cb11a6bccf      1
+     66 0x2879707ec9b6c9c84d9c2512b64cd6ab36882cbc      1
+     67 0x2911bb4af656677b277908a9f3b5c996e2e37580      1
+     68 0x295d960d752771579118c21a3d82f6c7cb3a06af      1
+     69 0x29b640216585fa07251eda3c4dfdcaf4419b7db4      1
+     70 0x2b0d374573cac356f4d2d74be3aa62b23db6e4ae      1
+     71 0x2b26da567c2a8c220daf91be8e37a429d33aef0b      1
+     72 0x2be9f18c46df11f05b581131af4d339c20c7254e      1
+     73 0x2bf308d324985dd121c366fd3fc398ec19d6651e      1
+     74 0x2d8a7bd04685cec7a2af1de46800e27b76d630e2      1
+     75 0x2d94ef86f8842726f7829bebd76b0b0ec2b6163d      1
+     76 0x2db0ac6cb953573153c2740502f60e248e2aefb9      1
+     77 0x2ef3ad422b423296a326466a90b667418b263eb0      1
+     78 0x302f442c5aa90177684b551883fc32b151178e7b      1
+     79 0x31e7bb24ac5e3684345514206d1f2fcdbfed557e      1
+     80 0x31eae19c7737925fad2ff2f007ccef3c9a7e2239      1
+     81 0x32113ff7ea112ed8a7151528e7468e648d0a692c      1
+     82 0x322f3f6c176027df2cd524549161c71ff66012fe      1
+     83 0x348d43bd8daeb9f13611d5f0838225e6a9d89bd0      1
+     84 0x34a77cc4ef2b1021d5e82df61b4441cce4218158      1
+     85 0x369615bc57975b06c418f42d3fda3754a385b97b      1
+     86 0x36d4706d9d8a106d2320fe14c9da4a4d13cbf498      1
+     87 0x37cbc09501e6965c97c0e4984a0a371b5d591dd9      1
+     88 0x3839a6c85a38de97abd0ecc092ef3311a7f1311e      1
+     89 0x38d2f3bc61b62de52a6e3df8cc963a75eda6d441      1
+     90 0x3a7c2eeb16d3ba5bc6ca62851c27bc179fd2dd4e      1
+     91 0x3c2550ddb9294c21d209999bdaa15f8249d0c161      1
+     92 0x3d2cb7cde9af93d668e0e84077faa4b7208d6061      1
+     93 0x3d990517b189864ec9ea63c9c74235f5e788bffd      1
+     94 0x3eb616e8b7f47b9adce97b10e1832f1ae93d6a24      1
+     95 0x3fe877b86a298326c13d911a99d59f4c9d195957      1
+     96 0x3febb7a93aa9865c7bc1ae14dcc94ff0a7132d46      1
+     97 0x412d974ca20038402a4e50d586fee6ba6a9279ed      1
+     98 0x41dd1c6338e5b3cdf9dc69e20dad9834ae36a6d3      1
+     99 0x41de1eed3fe18618f0df558ea363c522ec18e194      1
+    100 0x43caf87bb1f32a558a4c89a04a27b66e943c6999      1
+    101 0x4428dd9585e610521cba37c59b2a415154d875fc      1
+    102 0x46105de145ceff841edc1382f3e9d6836ae4a609      1
+    103 0x47e054a8fcf3e27a4bed979c33ab65a5883fe437      1
+    104 0x47eabc96c1825826b7cb176673e4bb936ac709b2      1
+    105 0x4839f0a75ede31d26613c7cdccba89be774e9856      1
+    106 0x48986c0ed1e324612b66e149f808efd1030723d6      1
+    107 0x4938d68c208aa1f0a34798a4343c584c58d259cb      1
+    108 0x49a606975f17ec67da1438e6be5309c112d4f4b4      1
+    109 0x4a9a40b2c44b7d32ecf4e0cc66f5304518ec0a59      1
+    110 0x4cd2dc5d7ae7d5128a5f3207cede5e6409686426      1
+    111 0x4f7106c4c161e138b1a39f47c91c4f1043437fb2      1
+    112 0x504ce3e7a71a4c87506b34fa4848f32d81ba3d8a      1
+    113 0x516656beacd4c41f4e1a2273263ff4995d0fd1d3      1
+    114 0x56e507da02d59190a59824308d1f63d40e0278af      1
+    115 0x57045a139aa21497bf2df3bec82009769646a514      1
+    116 0x5712ec69b1dedf934303ce530ae2b4f1d3ca4c61      1
+    117 0x574a8af005c82eaf05e92c9ccc01048e1eb1ae41      1
+    118 0x5771b01da3de10fecaca1a9ec601f1ab1fc43b41      1
+    119 0x57dec6115e561f3de9fb7429cf14de429713b3d6      1
+    120 0x58ac0439d856e25729d24beaef4f50effa00d834      1
+    121 0x58c5b881fb2794d04f0dc0ec65f94a119cd43aa0      1
+    122 0x58cc72c8007eed0cd4840896838bfac3ff92d254      1
+    123 0x5b1022d859a46f42fcf24bcd8f5ab616e52b4800      1
+    124 0x5b6f36473aea942c3dbcede8fb2a9c645fe75fd1      1
+    125 0x5bd6db4f6394f71ff7b678d43cccd953e1a516c5      1
+    126 0x5c18d25064b9abc166ec38d15408d5569176e8cd      1
+    127 0x5caa9135d438e512780bd920fbce06a547bebb6e      1
+    128 0x5d57a0f243615177fd26427b323a1fbec433b865      1
+    129 0x5d7a182082c433090596e2ed57d4f88cf6468d81      1
+    130 0x5d7c9186e70bff5b65668db66ea7bb9bbdb81d3f      1
+    131 0x5e65a0ae97928b30f44c6fb852c27cbb47acdeda      1
+    132 0x5f447199987971edb01e358cf67f390df9e75237      1
+    133 0x5f883431d7467e42b1df641ae7b57144b01bbbfa      1
+    134 0x60a363530ec7db4fe74f5ebe62c337fdca8efe0f      1
+    135 0x618d17fa59c67aea20a88dc75d4e28e728a6ff28      1
+    136 0x61b50a74376a9cd1dabf20bc922017441f9f8267      1
+    137 0x61e5b700f4b20bdeaefe0eaaddb6816ecd403491      1
+    138 0x621fa2a2dff1012ce2989e583c407d060ef59754      1
+    139 0x6281a2ba2120ee1fcc6100becafe472291ba8e6f      1
+    140 0x62cfac7b1fd0d340a140da4faa55656e1f5879f8      1
+    141 0x6519cc343b07b3cc7d67d2ba35ae6b56da91f135      1
+    142 0x66259e8a66b12c610d5819573546ccadde9d0001      1
+    143 0x677eee9c51328095ee201887cb06fc189c505080      1
+    144 0x688ffae751fd12ed525983af83952d63b6d9a952      1
+    145 0x6a3944e4658f6473111f5b22ede4da422e1689d3      1
+    146 0x6a4701c6df709f0b4ff349b8be36d2424cd116c6      1
+    147 0x6a474c30c9e503a5671132e4d7b8b20524571880      1
+    148 0x6a682375545982da6d5c926dc65e3a8d360720e2      1
+    149 0x6a6d335d1ca6c4539b7cee6476b706685f97bc78      1
+    150 0x6b912a4a8d185e3e6f50c75c9597fb6741f75be7      1
+    151 0x6c5f56ec2cbbe1c9a8539407b121834d2c8f8dfe      1
+    152 0x6d25c0fa070e625dac76b29bcf0917303cd52e7b      1
+    153 0x6d5f1fc2799d285f26951ad0d2bffd6a85cb2b6f      1
+    154 0x6e2fbc139e37b43f4f29cc10b7bede36587f7306      1
+    155 0x70e7a6621f4cb3c3e073d0539899f49fc88424c0      1
+    156 0x72e00700f3f3994001603ee494c0a2d6bfcf8d78      1
+    157 0x751f655ff4fbd7dd77f12e0f9ed5d0075cba1b5f      1
+    158 0x7583534d2f2c3699b1acd11b9f2fac9c35acc45c      1
+    159 0x759c51e04dd9062e8d2071febe9d47caea199de5      1
+    160 0x7674586111ec6327c54fcde0bcfaf43384e1fc7e      1
+    161 0x777c87cacd482f5f5667859bc0a83acc7c931151      1
+    162 0x782ff3f609427680db175365c24c238f89fdd276      1
+    163 0x783d71028044c5e8a6c997b705284865d02f751f      1
+    164 0x785442cfd567214856fde0906774574a8285bb67      1
+    165 0x79d18826ae673c828f0beb90eaa98f97eaa616b1      1
+    166 0x79fdcd2a99070c0b78d84a9948f9bd21bbfbe8ba      1
+    167 0x7a31e37689852a9a747426c6ac573d43327a7483      1
+    168 0x7aafb5a543c1171405f1ab67451b08b8ba33b2db      1
+    169 0x7c2f06ab61a94fe9760cc8d9ad35a33c0472cb8e      1
+    170 0x7dd758d5b7e10bd45cef5b2bc79d17bf45192e10      1
+    171 0x807ea4c5d7945dfea05d358473fee6042e92cf37      1
+    172 0x81d0b349529339c553484f324f0b7dc8aaaf3ecf      1
+    173 0x82d8e20bdc15dcba70bc1bd2024ec42334141a54      1
+    174 0x82e133653e5069a61062b28795ef19a99a3d2c75      1
+    175 0x8348735e5192371ab899118d5cf9fb258d7ce5c0      1
+    176 0x838a1c2f0cae94072332c346533acdc6c590971f      1
+    177 0x85d04aa7070871cf58a994f780cfb656d5e8fb2d      1
+    178 0x8605cf36085697fcda20be5488df08f407f73430      1
+    179 0x8699793e22403b355185d8ff76e7392f98aafa46      1
+    180 0x86cc7ad354441bae1304f55c1f6df8ba98d44af2      1
+    181 0x89b88287e2905003551f06ed77c3491be360de8d      1
+    182 0x89fad20f29de44b28c66abcd47113227e8308479      1
+    183 0x8a9d3812020d70bd487c79f2ce471ccf87e17ad1      1
+    184 0x8b611a5198f49c985823be094726da9d39387d80      1
+    185 0x8bf2b644c73133899aceb3039ea79107db52cb62      1
+    186 0x8e63e4376dde62cb82f5a91c4bce4156457dedb1      1
+    187 0x8e68e9d99f027cfdff2c46ab10988d2739f06c77      1
+    188 0x8e82a5b8f8f0b86ead15a4e56dfdcf2418ffe647      1
+    189 0x8eac39817aa7a1072c6e81859aff383f534a4105      1
+    190 0x8ebd84269464b6ad7353d192f3b487e69d607e05      1
+    191 0x8f052c26f086a90059b53d269ea44b79c6be255b      1
+    192 0x8f37b12a6860e29a3ef3f8bbaff16c32a43a379a      1
+    193 0x8f54249ae4c8a73e92d44459e026c9197670f3fd      1
+    194 0x8feaa088c9eccaf9dfc4bc4f10775104f36fc12d      1
+    195 0x9052e1b507c2b00ad3acdab4e47eb2dcb98dd59f      1
+    196 0x924a1fe275c0ea466c519830719c8d216c415e19      1
+    197 0x93433264cccb31c80a62b0eee78e37ebbb0377e3      1
+    198 0x938ec91427b4e8f0d35261ff1cc4dd04590ba642      1
+    199 0x94022df1d740bb94342f2ae82817eff3352bfcba      1
+    200 0x9446ca49d384f18657bd41060bf6cae024f16fc3      1
+    201 0x949ba575b86a5a86c4190a33bf4a49ec9f704215      1
+    202 0x94fb300b3796bd07bdda0f3bf94cf17952a0a11a      1
+    203 0x9576638139843c636a0522f3bff3a85ac7b07172      1
+    204 0x975fc3062c790429e40b1085728b3938d5bcef72      1
+    205 0x982d3c5223f6b5794fccb3208eb164d042cf2526      1
+    206 0x9929fef8c8f3e09e6e7d9caa69e50ce185a95a69      1
+    207 0x996d36a1f4dc7a497a685cd33356d2311fe9015f      1
+    208 0x9a6342516b1b209535c3a904ffd5055a45e48e29      1
+    209 0x9b16cc7f4ae8c718d630fe6fe474b85d2a0cbac3      1
+    210 0x9b8b24e3d406627984eb3782f358ac00431bd93a      1
+    211 0x9bb524bccce50c6a3606cecd80cfaa38d7d4fc26      1
+    212 0x9bd4b05b6f3cd3778012f72c16c42fd0490cfb3e      1
+    213 0x9cd27b1142ca7dcf60167355791a4089463347ae      1
+    214 0x9e53563dbfea80b39bf683b7d52df449a2b247e7      1
+    215 0x9e8b401a1173539a92e640629c0e004a9803dfb1      1
+    216 0x9ea50708e47a237182a56c481a4d11dd021b7ec2      1
+    217 0x9f5f028527bf4436545522550ba4ec2b14e6298d      1
+    218 0xa05cd277ba50ec72fc41917437a6c09e39b99bbb      1
+    219 0xa0df120104cc8796af1377b931b30279b2a01ae8      1
+    220 0xa20416801ac2eacf2372e825b4a90ef52490c2bb      1
+    221 0xa219be7d2585095f48a03ea981730e31ffe601fa      1
+    222 0xa23cb68780be74b254a5f7210ec6cf1c76289953      1
+    223 0xa39d385628bd00438f8a9ba4050a25a0210f84eb      1
+    224 0xa46e0226d3c988ebafadd1838daf2a3318f21783      1
+    225 0xa68dce940c5bb9c601b9293f01aaf2d2db98e325      1
+    226 0xa6c12d417553f4c9a12c6d4376bc2b56e43eb2dc      1
+    227 0xa70c5254f8db7c3dd740493b5e8a8dc2a1c9b233      1
+    228 0xa8174abc36b3298356d273e512cd87223a2b3ffa      1
+    229 0xa81d194cfc13364eee82abf32c8451264287aadd      1
+    230 0xa8335843bbe4917cb11a4ca8620f08e48b2c9cf9      1
+    231 0xab8270c8ffc59d00c8cf7350518faee68312a59e      1
+    232 0xab9f44a5c2b5fa488302668e49c1cf473dc43d94      1
+    233 0xaba2407532c89b522f9075c7676e1fb94d664103      1
+    234 0xac2d7e0ed8cccecc3ba6a6280ee8848bd3c93ad4      1
+    235 0xacd1e1c0c86270019db017708e8936f54d78ca3e      1
+    236 0xaf44539ba68c318a0de5e1d7899a669f374e180b      1
+    237 0xb01b3a335db49192a31af43a88c458e5070ca5e1      1
+    238 0xb13e2b1fcd163bc3705b1867487e9617a970a062      1
+    239 0xb175855d114f6560105e0d7c608785466879a27d      1
+    240 0xb1adc3a1298819c6b1d18c2af1081f04b8d53176      1
+    241 0xb1e88047fe82218fea3250bf01cf3d3394b030f0      1
+    242 0xb209e4bd577cecb120fcd1797ee399ddd6533ac5      1
+    243 0xb27ef7117aa0b6aa34e051221a1932de261426c1      1
+    244 0xb3b1eade1dc24662b988f3b3e20384050f4ed189      1
+    245 0xb44ee02a1a80ae1089501f0e16d7515e6ca19fff      1
+    246 0xb78e99d2301ee621f4332a0d1ef759423976d8b6      1
+    247 0xb811dc71af7d9242a161d43318a5ca685f56f680      1
+    248 0xb8a4624d5eb9dbf05fde82a3af920100c7a19086      1
+    249 0xb9234734c1ace23b0c57c126049a2c40b29093ca      1
+    250 0xb9552a89286e7b3feaf7a5048873aa770f7906d0      1
+    251 0xbaa4aa9933b4548cff0be2693e7af7e14e9ee49b      1
+    252 0xbab9abed42ad306ca536be9f095d41cb9ec26f9d      1
+    253 0xbb1d6ee66888123aeaf75349a6e6026979519acd      1
+    254 0xbb5e3399daf10fbc5094e3f4d3b9aedb7547856c      1
+    255 0xbb6c4b3e0cf16e8e772fcb571901e432262de72f      1
+    256 0xbcaeb5ddadbb3ba2880b19d254e0cf5e23a68917      1
+    257 0xbd2c9b8e92eb619113456b2db3ca27e935856247      1
+    258 0xbd6006b93f10b484d22d5a9d4e17bfd0ade4f614      1
+    259 0xbdb8ff99d03f45df9a38a20fa80da44c5ad88b24      1
+    260 0xbdc29767d8bc6dd6b08d64d74c8ecf11b3f5ccf4      1
+    261 0xbec69dfce4c1fa8b7843fee1ca85788d84a86b06      1
+    262 0xc0e40065d60328f33269d3b4846dbfbcb2b12045      1
+    263 0xc11a862ba1125a1bc6b4ff11b2ead6b8e73ea52f      1
+    264 0xc2b3cb204e96270d763c70c75ae1a77c739b0e6d      1
+    265 0xc2e7c3a5675ee1308d56f5e4fd614007e0fcc63b      1
+    266 0xc4f94270364674f3bcce1487d98a959e72427dba      1
+    267 0xc53f977136e1aa9031343fad39dcb4c11a1eb3c6      1
+    268 0xc5641cb442f0d9672233f19dbf4bf1f6b27ab30b      1
+    269 0xc57cc3d39dbc8786f320bdb7d55ff02efdfc6d4a      1
+    270 0xc60617d084e6b70c7d39226b72096626622de8e3      1
+    271 0xc6fece04694a1abc42f757f03a2a6ea51f0989a0      1
+    272 0xc74fe643cb0a42f93ba085afdd5a5e77cb2b540a      1
+    273 0xc81635abbf6ec73d0271f237a78b6456d6766132      1
+    274 0xc97705a8e073c9c0ba05d71aede57903a4a359f6      1
+    275 0xc97a112ca84a12cbdb7f47384a38e19c8622a6ac      1
+    276 0xcb8d9eecf33ba585d5e00a87bfaea4114999c5f0      1
+    277 0xccaa0838aa1b804873fa49b5309fe90fe23c1f58      1
+    278 0xcde7970b78ee805ff4b0c32a7d3f23e40bcc9554      1
+    279 0xce2c67c341a57b91439c99fa2c39268189a61dc6      1
+    280 0xcefb3ff344a0680b59896d8f273c473184c69281      1
+    281 0xcf1320fd381bfdfc9ce76cbe9806aab1871244b4      1
+    282 0xd00911c7f9e5993ea0cd28cb615c6b21a0101666      1
+    283 0xd070ada7f4a088444e61bbfc1fe6a31d87ea0e92      1
+    284 0xd0f2b4436a280450290cf63490542befad404863      1
+    285 0xd26cfc32d233fa6842684551b8f356df390acd67      1
+    286 0xd38a87d7b690323ef6883e887614502abcf9b1eb      1
+    287 0xd4d365f2c4c136d0ba998565fc8cf28c5bb3d700      1
+    288 0xd514dc9996c400b58d5654bec86bcef6200dafa1      1
+    289 0xd5b1bf6c5ba8416d699e016bb99646ca5dbab8d7      1
+    290 0xd63929e5f4c6e82f683d3a5f260a393d47e1cef3      1
+    291 0xd68615c82c613ca1f42fcdeaeddfa0e1d4c87e6d      1
+    292 0xd70676cfa67abc65a8c39f049d62eea30e3080cf      1
+    293 0xd83e662b83880081741d0e810c3fe8630fa6cb4d      1
+    294 0xd8876ff5ed0dd399efb2e7cc2d1a9a67b43277f2      1
+    295 0xdbeca36c48306867d9285e0e0d5ed1f5aec28a35      1
+    296 0xdc898f74059a5fac9873e3ba58b5dcf1fae6b6e5      1
+    297 0xde3c597480051d659a3611569a3affa367000d0d      1
+    298 0xdf5b0e3887ec6cb55c261d4bc051de8dbf7d8650      1
+    299 0xe049f1c4a9b7230fa071af829269a8c34668e25e      1
+    300 0xe1f0da1b238db9cb3e51bca447f1210c7134277d      1
+    301 0xe1ff19610020d72930aee1b9c047e35b7fd0080e      1
+    302 0xe2a323110f58ee47cd6ccdfe303ac75aa1748cb4      1
+    303 0xe3916f1dd2b564f1fcbd0d28b86992120a896a58      1
+    304 0xe3ba95950e0e679bd4868e6c60232a742e9fc9b9      1
+    305 0xe55de13319ed4de98f740ba608ca49d27a420982      1
+    306 0xe55f32e874b540f6ad8584a56a484b76cda4a08f      1
+    307 0xe5f648ea98f17aa12acd59468643c62fbbf813eb      1
+    308 0xe63428be7f7f2df427730768d91f7dcf7cd10477      1
+    309 0xe6d12896544b7753714b4e6ca14817b3e2dcd0a1      1
+    310 0xe6d50cb6e7423c742f409db65f19518018b45968      1
+    311 0xe70718e56f98b3c6c6e1bb6cdeb53e3cbb940ea1      1
+    312 0xe77d44e642c53db943aa0a71ef60cbff719e644e      1
+    313 0xe7ee5a3a7e0c9114a0d39f53619bad9ec7466068      1
+    314 0xe9eaf0fd93b77aee1c012e91b4a7653553949b7b      1
+    315 0xeb193090edbd341f606c30af743b48943b750272      1
+    316 0xeb7921cda81164f7e711ac0bec1a9243fd10a815      1
+    317 0xebaedb897fc974f35bf36f075d60cd75e46d2d4c      1
+    318 0xed9788430cd53dd218c80063b2b788a99d95065d      1
+    319 0xee819d8c6d914f5c7a217d1b1cef88056da786f2      1
+    320 0xef5ee368011180dfd6fa4d07b0cf9f4ffa4ee218      1
+    321 0xf041c4f026547f7fbea6904f77bea16997024751      1
+    322 0xf08755720ffee568d320c7daa9f5822b82c4f7a8      1
+    323 0xf141a37978d4b14a4a63936d4b3aaac479fef943      1
+    324 0xf14ff6c6c32172dfbe09e1ab2dcda4173fe9ad23      1
+    325 0xf1f1e267a26648cf9f39f0402ec75b72cb292587      1
+    326 0xf2285af9aac7d12574784476b9bc43f8adac034f      1
+    327 0xf2bef831670df52ae5492dcaf6ae62aac86f6cc7      1
+    328 0xf3772ac6a4a92d74d2e20512bdf36c56fe82a445      1
+    329 0xf3e6fbbd35e2ea84bdfdce9be96ffdb2b8bd1fc8      1
+    330 0xf598aadf12a2fc4709b5db0c4c169715efaf2038      1
+    331 0xf8027e0f03c95782ef9be1826828bee931c1ab83      1
+    332 0xf90a1d5081c7c66d13762fbdb5ff3cd5fde3d844      1
+    333 0xf944030287430a84583e565e8feb3792e9db0708      1
+    334 0xf9f40128e49d2941fc7c906a9eca8bb65b54d60d      1
+    335 0xfa3dabf38f872f50c62c3d39920d173d215806ec      1
+    336 0xfaa3d6b9c564901468b9e0da4c346f63926192b9      1
+    337 0xfb541dc23e3b4359275d37e9e8ea3dc54cae5ff8      1
+    338 0xfc4b4bba9094da6d787af593ecde8079b383a983      1
+    339 0xfcbca52b23db28470eb97680d18e988d8b60b608      1
+    340 0xfd7966bedeea8b6a0c97f97824d5649b80fe39a2      1
+    341 0xfdd41f8325e243f200a34cd2fa28594efd5e4c6f      1
+    342 0xfe89edfb84290697f0b62553a14f2a87c894e703      1
+
+## Versioning
+
+``` r
+R.version$version.string
+```
+
+    [1] "R version 4.2.2 (2022-10-31)"
+
+``` r
+packageVersion("tidyverse")
+```
+
+    [1] '1.3.2'
+
+``` r
+packageVersion("magrittr")
+```
+
+    [1] '2.0.3'
