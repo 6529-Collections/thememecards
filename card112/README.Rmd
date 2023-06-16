@@ -1,0 +1,213 @@
+---
+output: rmarkdown::github_document
+editor_options: 
+  chunk_output_type: console
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, comment="")
+library(tidyverse)
+library(magrittr)
+```
+
+## Data
+```{r}
+fn <- "snapshot.csv"
+snapshot <- readr::read_csv(fn, col_types=c("ccdcc"))
+snapshot$balance <- as.integer(snapshot$balance)
+summary(snapshot)
+```
+
+## Seed
+```{r}
+block <- 17483969 # https://etherscan.io/block/17483969
+block_hash <- "0x5718c9275e9602528ebeda83d1a4810ec2ce89f26dadbdbdb445e068b895097c"
+# Convert block hash to ASCII
+# Take the sum over integer vector to set seed
+seed <- sum(utf8ToInt(block_hash))
+cat("Seed:", seed, "\n")
+```
+
+## Code
+```{r}
+subtract_multi <- function(x, y) {
+  for (i in y) {
+    where <- match(i, x)
+    if (!is.na(where)) {
+      x <- x[-where]
+    }
+  }
+  return(x)
+}
+
+pick <- function(df,
+                 contracts=c(),
+                 address_remove=NULL,
+                 address_subtract=NULL,
+                 address_max=Inf,
+                 address_pick=NA,
+                 address_replace=FALSE) {
+
+  df <- df %>%
+    dplyr::filter(name %in% contracts) %>%
+    dplyr::filter(!(address %in% address_remove))
+  
+  df_by_address <- df %>%
+    dplyr::group_by(address) %>%
+    dplyr::summarise(
+      balance = ifelse(sum(balance) <= address_max, sum(balance), address_max)
+    )
+  
+  pool <- df_by_address %>%
+    dplyr::arrange(address) %>%
+    dplyr::select(address, balance) %>%
+    purrr::pmap(function(address, balance) {
+      base::rep(address, balance)
+    }) %>%
+    unlist() %>%
+    subtract_multi(address_subtract)
+  
+  if (is.na(address_pick)) {
+    return(pool)
+  } else {
+    return(base::sample(pool, size=address_pick, replace=address_replace))
+  }
+}
+
+tally <- function(x) {
+  if (length(x) > 0) {
+    unlist(x) %>%
+    data.frame(address = .) %>%
+    dplyr::group_by(address) %>%
+    dplyr::summarise(
+      amount = n()
+    ) %>%
+    dplyr::arrange(desc(amount), address)
+  }
+}
+```
+
+```{r}
+base::set.seed(seed)
+
+address_remove <- c(
+  "0x3a3548e060be10c2614d0a4cb0c03cc9093fd799",
+  "0x4b76837f8d8ad0a28590d06e53dcd44b6b7d4554",
+  "0x0887773b5f43c58f0da7bd0402fc2d49482eb845",
+  "0xcda72070e455bb31c7690a170224ce43623d0b6f",
+  "0x41a322b28d0ff354040e2cbc676f0320d8c8850d",
+  "0x000000000000000000000000000000000000dead"
+)
+
+hodlers_remove <- c(
+  ""
+)
+
+allow_artist_phase1       <- pick(snapshot, contracts=c("SuperRare","SilentTravelers","Foundation","NikolinaPetolas","MakersPlace","KnownOrigin","NikolinaPetolasEditions","NikolinaPetolasArt"), address_remove=address_remove,address_max=1)
+
+allow_memesRandom1_phase1 <- pick(snapshot, contracts=c("memes1"), address_remove=address_remove,address_pick=75,address_max=1)
+allow_memesRandom2_phase1 <- pick(snapshot, contracts=c("memes2"), address_remove=address_remove,address_subtract=allow_memesRandom1_phase1,address_pick=100,address_max=1)
+allow_memesRandom3_phase1 <- pick(snapshot, contracts=c("memes3"), address_remove=address_remove,address_subtract = c(allow_memesRandom1_phase1, allow_memesRandom2_phase1),address_pick=90,address_max=1)
+allow_memesRandom4_phase1 <- pick(snapshot, contracts=c("memes4"), address_remove=address_remove,address_subtract = c(allow_memesRandom1_phase1, allow_memesRandom2_phase1, allow_memesRandom3_phase1),address_pick=90,address_max=1)
+allow_memesRandom5_phase1 <- pick(snapshot, contracts=c("memes5"), address_remove=address_remove,address_subtract = c(allow_memesRandom1_phase1, allow_memesRandom2_phase1, allow_memesRandom3_phase1, allow_memesRandom4_phase1),address_pick=90,address_max=1)
+allow_memesRandom6_phase1 <- pick(snapshot, contracts=c("memes6"), address_remove=address_remove,address_subtract = c(allow_memesRandom1_phase1, allow_memesRandom2_phase1, allow_memesRandom3_phase1, allow_memesRandom4_phase1, allow_memesRandom5_phase1),address_pick=69,address_max=1)
+allow_gradient_phase1     <- pick(snapshot, contracts=c("gradient"), address_max=1)
+
+
+allow_raw                 <- pick(snapshot, contracts=c("raw"), address_remove=address_remove,address_max=1)
+allow_singles             <- pick(snapshot, contracts=c("65291/1s"), address_remove=address_remove,address_max=1)
+
+
+```
+
+
+
+
+## Allow Artist Phase 1
+```{r}
+c(allow_artist_phase1) %>%
+tally() %T>%
+readr::write_csv(file="allow_artist_phase1.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Allow Random1 Memes Phase 1
+```{r}
+c(allow_memesRandom1_phase1) %>%
+tally() %T>%
+readr::write_csv(file="allow_random1memes_phase1.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Allow Random2 Memes Phase 1
+```{r}
+c(allow_memesRandom2_phase1) %>%
+tally() %T>%
+readr::write_csv(file="allow_random2memes_phase1.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Allow Random3 Memes Phase 1
+```{r}
+c(allow_memesRandom3_phase1) %>%
+tally() %T>%
+readr::write_csv(file="allow_random3memes_phase1.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Allow Random4 Memes Phase 1
+```{r}
+c(allow_memesRandom4_phase1) %>%
+tally() %T>%
+readr::write_csv(file="allow_random4memes_phase1.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Allow Random5 Memes Phase 1
+```{r}
+c(allow_memesRandom5_phase1) %>%
+tally() %T>%
+readr::write_csv(file="allow_random5memes_phase1.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Allow Random6 Memes Phase 1
+```{r}
+c(allow_memesRandom6_phase1) %>%
+tally() %T>%
+readr::write_csv(file="allow_random6memes_phase1.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+## Allow Gradient Phase 1
+```{r}
+c(allow_gradient_phase1) %>%
+tally() %T>%
+readr::write_csv(file="allow_gradient_phase1.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+
+
+
+
+
+## Allow 6529
+```{r}
+c(allow_raw, allow_singles) %>%
+tally() %T>%
+readr::write_csv(file="allow_6529_phase2.csv", col_names=FALSE) %>%
+print(n=Inf)
+```
+
+
+
+
+## Versioning
+```{r}
+R.version$version.string
+packageVersion("tidyverse")
+packageVersion("magrittr")
+```
